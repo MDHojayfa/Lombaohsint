@@ -1,0 +1,88 @@
+# ============================================================
+# LOMBAOHSINT v2.0 BLACK EDITION — GLOBAL CONFIGURATION
+# DO NOT EDIT UNLESS YOU KNOW WHAT YOU'RE DOING.
+# ============================================================
+
+# Aggression Level: GENTLE / NORMAL / BLACK
+# GENTLE: Only public APIs, no scraping, no Tor
+# NORMAL: Mix of public + light scraping, limited Tor
+# BLACK: Full automation, Tor, proxy rotation, brute-force, darkweb, no limits
+level: "BLACK"
+
+# Output settings
+output_dir: "reports"
+export_formats:
+  - "md"
+  - "html"
+  - "json"
+
+# Logging
+verbose: false
+log_file: "data/logs/lombaohsint.log"
+max_log_size_mb: 100  # Rotate logs if >100MB
+log_retention_days: 7
+
+# Network behavior
+request_timeout: 10          # Seconds before timeout
+delay_between_requests_sec: 0.5  # Minimum delay between API calls
+max_retries: 3               # Retry failed requests this many times
+retry_delay_base_sec: 2      # Exponential backoff base
+
+# Proxy & Tor Configuration
+use_tor: true                # Enable Tor routing (required for darkweb)
+tor_port: 9050               # Default Tor SOCKS port
+tor_control_port: 9051       # For control commands (restart circuit)
+proxy_rotation_enabled: true # Rotate proxies after each module
+proxy_list:
+  - "http://proxy1.example.com:8080"
+  - "http://proxy2.example.com:8080"
+  - "socks5://127.0.0.1:9050"  # Always include Tor as last option
+
+# API Keys — LEAVE EMPTY IF USING FREE TIER OR NO KEY
+api_keys:
+  twilio: ""                  # https://twilio.com/console
+  numverify: ""               # https://numverify.com
+  hunterio: ""                # https://hunter.io
+  intelx: ""                  # https://intelx.io
+  shodan: ""                  # https://shodan.io
+  censys: ""                  # https://censys.io
+  haveibeenpwned: ""          # https://haveibeenpwned.com/API/v3
+  github: ""                  # Personal Access Token (PAT) for GitHub API
+  clearbit: ""                # https://clearbit.com
+  pipl: ""                    # https://pipl.com
+  truecaller: ""              # Not public — requires mobile app reverse engineering
+  trestle: ""                 # https://trestle.io
+  riskseal: ""                # https://riskseal.com
+
+# AI Engine Settings — REAL MODELS ONLY (NO FICTION)
+ai_model: "gpt-4o"            # Options: gpt-4o (OpenAI), llama-3-70b-instruct (local), mistral-7b-instruct
+ai_endpoint: "https://api.openai.com/v1/chat/completions"  # Override if using local LLM server
+ai_api_key: ""                # Your OpenAI key — leave empty if using local model
+ai_summary_enabled: true      # Generate AI summary? YES/NO
+ai_unethical_insights: true   # Include attacker perspective? YES/NO
+ai_max_tokens: 1500           # Max response length from AI
+ai_temperature: 0.7           # Creativity level — higher = more speculative
+ai_local_mode: false          # Run LLM locally? Requires GPU + Ollama / LM Studio / vLLM
+ai_local_model_name: "llama-3-70b-instruct"  # If ai_local_mode=true, this must be installed via Ollama
+
+# Storage & Caching
+cache_ttl_hours: 24           # How long to keep cached results before re-scanning
+use_sqlite_cache: true        # Store breach data in SQLite for persistence
+sqlite_db_path: "data/breaches.sqlite"
+
+# Termux-specific fixes (only active on Android)
+termux_fix_enabled: true      # Patch Termux environment automatically?
+sdcard_mount_path: "/storage/emulated/0"  # Where your internal storage is mounted
+termux_bin_path: "/data/data/com.termux/files/usr/bin"
+
+# Daemon Mode — background scanning
+agent_enabled: false          # Run as background service?
+agent_interval_minutes: 120   # Check for new breaches every X minutes
+agent_notify_telegram: false  # Send alerts to Telegram?
+telegram_bot_token: ""        # Get from @BotFather
+telegram_chat_id: ""          # Get from @getmyid_bot
+
+# Advanced Behavior
+skip_public_apis: false       # Skip all public APIs? (for stealth)
+force_new_scan: false         # Ignore cache — always re-scan
+enable_debug_mode: false      # Log raw responses, headers, cookies
