@@ -55,8 +55,10 @@ api_keys:
   riskseal: ""                # https://riskseal.com
 
 # AI Engine Settings — REAL MODELS ONLY (NO FICTION)
-ai_model: "gpt-4o"            # Options: gpt-4o (OpenAI), llama-3-70b-instruct (local), mistral-7b-instruct
-ai_endpoint: "https://api.openai.com/v1/chat/completions"  # Override if using local LLM server
+#ai_model: "gpt-4o"            # Options: gpt-4o (OpenAI), llama-3-70b-instruct (local), mistral-7b-instruct
+#ai_endpoint: "https://api.openai.com/v1/chat/completions"  # Override if using local LLM server
+ai_model: "gpt-5"
+ai_endpoint: "https://api.openai.com/v1/chat/completions"
 ai_api_key: ""                # Your OpenAI key — leave empty if using local model
 ai_summary_enabled: true      # Generate AI summary? YES/NO
 ai_unethical_insights: true   # Include attacker perspective? YES/NO
@@ -86,3 +88,4 @@ telegram_chat_id: ""          # Get from @getmyid_bot
 skip_public_apis: false       # Skip all public APIs? (for stealth)
 force_new_scan: false         # Ignore cache — always re-scan
 enable_debug_mode: false      # Log raw responses, headers, cookies
+
