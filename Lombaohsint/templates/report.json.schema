@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Lombaohsint Report Schema",
+  "description": "Schema for lombaohsint v2.0 report output",
+  "type": "object",
+  "properties": {
+    "target": {
+      "type": "string",
+      "description": "The input target (email, phone, username, keyword)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the report was generated"
+    },
+    "total_findings": {
+      "type": "integer",
+      "description": "Total number of findings across all modules"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "source": { "type": "string" },
+          "data": { "type": "object" },
+          "risk": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+          }
+        },
+        "required": ["type", "source", "data"]
+      }
+    },
+    "ai_summary": {
+      "type": "object",
+      "properties": {
+        "digital_twin": {
+          "type": "object",
+          "properties": {
+            "identity": {
+              "type": "object",
+              "properties": {
+                "emails": { "type": "array", "items": { "type": "string" } },
+                "phones": { "type": "array", "items": { "type": "string" } },
+                "usernames": { "type": "array", "items": { "type": "string" } }
+              }
+            },
+            "exposure": {
+              "type": "object",
+              "properties": {
+                "breaches": { "type": "integer" },
+                "secrets": { "type": "integer" },
+                "social_profiles": { "type": "integer" }
+              }
+            },
+            "behavior": {
+              "type": "object",
+              "properties": {
+                "tech_exposure": { "type": "string" },
+                "public_presence": { "type": "string" }
+              }
+            }
+          }
+        },
+        "ethical_insight": { "type": "string" },
+        "unethical_awareness": { "type": "string" }
+      }
+    }
+  },
+  "required": ["target", "timestamp", "total_findings", "findings"]
+}
