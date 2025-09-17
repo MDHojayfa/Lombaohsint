@@ -1,6 +1,6 @@
 import requests
 import phonenumbers
-from phonenumbers import geocoder, carrier, parse
+from phonenumbers import geocoder, carrier, parse, NumberParseException
 from urllib.parse import quote
 import json
 import time
@@ -22,22 +22,24 @@ def run(target, level, config, api_wrapper, proxy_rotator):
     headers = {"User-Agent": get_random_ua()}
     proxies = proxy_rotator.get_current_proxy()
 
-    # Normalize phone number
+    # --- STEP 1: PARSE AND VALIDATE PHONE NUMBER FOR ANY COUNTRY ---
     try:
+        # Parse without assuming region — let phonenumbers auto-detect
         parsed = parse(target, None)
         if not phonenumbers.is_valid_number(parsed):
             return results
         normalized = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
-    except:
+        country_code = phonenumbers.region_code_for_number(parsed)
+        if not country_code:
+            return results  # Invalid or unrecognizable number
+    except NumberParseException:
         return results
 
-    # 1. NumVerify
+    # --- STEP 2: USE NUMVERIFY (SUPPORTS 232 COUNTRIES) ---
     if config['api_keys']['numverify']:
         try:
-            resp = requests.get(
-                f"http://apilayer.net/api/validate?access_key={config['api_keys']['numverify']}&number={quote(normalized)}",
-                headers=headers, proxies=proxies, timeout=8
-            )
+            url = f"http://apilayer.net/api/validate?access_key={config['api_keys']['numverify']}&number={quote(normalized)}"
+            resp = requests.get(url, headers=headers, proxies=proxies, timeout=8)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("valid"):
@@ -46,26 +48,25 @@ def run(target, level, config, api_wrapper, proxy_rotator):
                         "source": "NumVerify",
                         "data": {
                             "number": data.get("number"),
-                            "country_code": data.get("country_code"),
-                            "location": data.get("location"),
-                            "carrier": data.get("carrier"),
-                            "line_type": data.get("line_type"),
+                            "country_code": data.get("country_code", country_code),
+                            "location": data.get("location", ""),
+                            "carrier": data.get("carrier", ""),
+                            "line_type": data.get("line_type", ""),
                             "is_valid": True,
                             "is_roaming": data.get("roaming", False),
-                            "is_prepaid": data.get("prepaid", False)
+                            "is_prepaid": data.get("prepaid", False),
+                            "country_name": data.get("country_name", "")
                         },
                         "risk": "LOW"
                     })
-        except: pass
+        except Exception as e:
+            logging.debug(f"NumVerify failed for {normalized}: {e}")
 
-    # 2. Twilio Lookup
+    # --- STEP 3: TWILIO LOOKUP (GLOBAL SUPPORT) ---
     if config['api_keys']['twilio']:
         try:
-            resp = requests.get(
-                f"https://lookups.twilio.com/v1/PhoneNumbers/{quote(normalized)}?Type=carrier&Type=caller-name",
-                auth=(config['api_keys']['twilio'], ""),
-                headers=headers, proxies=proxies, timeout=8
-            )
+            url = f"https://lookups.twilio.com/v1/PhoneNumbers/{quote(normalized)}?Type=carrier&Type=caller-name"
+            resp = requests.get(url, auth=(config['api_keys']['twilio'].split(':')[0], config['api_keys']['twilio'].split(':')[1]), headers=headers, proxies=proxies, timeout=8)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("carrier"):
@@ -76,21 +77,19 @@ def run(target, level, config, api_wrapper, proxy_rotator):
                             "number": data.get("phone_number"),
                             "carrier_name": data.get("carrier", {}).get("name"),
                             "carrier_type": data.get("carrier", {}).get("type"),
-                            "caller_name": data.get("caller_name", {}).get("name") or "Unknown"
+                            "caller_name": data.get("caller_name", {}).get("name") or "Unknown",
+                            "country_code": data.get("country_code", country_code)
                         },
                         "risk": "LOW"
                     })
-        except: pass
+        except Exception as e:
+            logging.debug(f"Twilio failed for {normalized}: {e}")
 
-    # 3. RiskSeal (SIM Swap Detection)
+    # --- STEP 4: RISKSEAL (SIM SWAP + FRAUD DETECTION) ---
     if config['api_keys']['riskseal']:
         try:
-            resp = requests.get(
-                f"https://api.riskseal.com/v1/phone/{quote(normalized)}",
-                headers={"Authorization": f"Bearer {config['api_keys']['riskseal']}"},
-                proxies=proxies,
-                timeout=8
-            )
+            url = f"https://api.riskseal.com/v1/phone/{quote(normalized)}"
+            resp = requests.get(url, headers={"Authorization": f"Bearer {config['api_keys']['riskseal']}"}, proxies=proxies, timeout=8)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("risk_score", 0) > 70:
@@ -101,21 +100,19 @@ def run(target, level, config, api_wrapper, proxy_rotator):
                             "risk_score": data.get("risk_score"),
                             "sim_swap_risk": data.get("sim_swap_risk", False),
                             "fraud_indicators": data.get("fraud_indicators", []),
-                            "last_seen": data.get("last_seen")
+                            "last_seen": data.get("last_seen"),
+                            "country_code": country_code
                         },
                         "risk": "CRITICAL"
                     })
-        except: pass
+        except Exception as e:
+            logging.debug(f"RiskSeal failed for {normalized}: {e}")
 
-    # 4. Trestle Reverse Phone (Identity Match)
+    # --- STEP 5: TRESTLE REVERSE PHONE (IDENTITY MATCH) ---
     if config['api_keys']['trestle']:
         try:
-            resp = requests.get(
-                f"https://api.trestle.io/v1/reverse-phone?number={quote(normalized)}",
-                headers={"Authorization": f"Bearer {config['api_keys']['trestle']}"},
-                proxies=proxies,
-                timeout=8
-            )
+            url = f"https://api.trestle.io/v1/reverse-phone?number={quote(normalized)}"
+            resp = requests.get(url, headers={"Authorization": f"Bearer {config['api_keys']['trestle']}"}, proxies=proxies, timeout=8)
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("identity"):
@@ -126,29 +123,47 @@ def run(target, level, config, api_wrapper, proxy_rotator):
                             "name": data.get("identity", {}).get("name"),
                             "address": data.get("identity", {}).get("address"),
                             "age": data.get("identity", {}).get("age"),
-                            "associated_emails": data.get("identity", {}).get("emails", [])
+                            "associated_emails": data.get("identity", {}).get("emails", []),
+                            "country_code": country_code
                         },
                         "risk": "HIGH"
                     })
-        except: pass
+        except Exception as e:
+            logging.debug(f"Trestle failed for {normalized}: {e}")
 
-    # 5. Truecaller (via web scraping fallback — limited)
+    # --- STEP 6: TRUECALLER WEB SCRAPE (WORLDWIDE) ---
     if level == "BLACK":
         try:
-            resp = requests.get(f"https://www.truecaller.com/search/{normalized[1:]}", headers=headers, proxies=proxies, timeout=8)
-            if resp.status_code == 200 and "result" in resp.text.lower():
+            # Remove + and leading zeros for URL
+            clean_num = normalized[1:] if normalized.startswith('+') else normalized
+            url = f"https://www.truecaller.com/search/{clean_num}"
+            resp = requests.get(url, headers=headers, proxies=proxies, timeout=8)
+            if resp.status_code == 200 and ("result" in resp.text.lower() or "profile" in resp.text.lower()):
                 results.append({
                     "type": "TRUECALLER_DETECTED",
                     "source": "Truecaller (Web)",
                     "data": {
                         "status": "Possible match found on public site",
-                        "note": "No direct API access — use with caution"
+                        "note": "No direct API access — use with caution",
+                        "country_code": country_code
                     },
                     "risk": "MEDIUM"
                 })
-        except: pass
+        except Exception as e:
+            logging.debug(f"Truecaller web scrape failed for {normalized}: {e}")
 
-    # Cache results if BLACK mode
+    # --- STEP 7: ADD COUNTRY NAME FROM PHONENUMBERS LIBRARY AS FALLBACK ---
+    # If any API didn't return country name, add it from phonenumbers
+    for result in results:
+        if result["type"] == "NUMVERIFY_LOOKUP" and not result["data"].get("country_name"):
+            try:
+                country_name = geocoder.description_for_number(parsed, "en")
+                if country_name:
+                    result["data"]["country_name"] = country_name
+            except:
+                pass
+
+    # --- CACHE RESULTS ONLY IN BLACK MODE ---
     if level == "BLACK":
         with open(cache_file, 'w') as f: json.dump(results, f, indent=2)
 
