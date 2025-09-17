@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lombaohsint Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #121212; color: #e0e0e0; font-family: 'Courier New', monospace; }
+        .card { background-color: #1e1e1e; border-color: #333; margin-bottom: 1rem; }
+        .badge-risk-critical { background-color: #ff4d4d; }
+        .badge-risk-high { background-color: #ff9900; }
+        .badge-risk-medium { background-color: #ffcc00; }
+        .badge-risk-low { background-color: #66cc66; }
+        pre { background-color: #0f0f0f; border: 1px solid #333; padding: 1rem; overflow-x: auto; }
+        .header { background-color: #0a0a0a; padding: 1.5rem; text-align: center; border-bottom: 2px solid #333; }
+        .section { margin-top: 2rem; }
+        .btn { margin: 0.2rem; }
+        .container { max-width: 1200px; }
+        .ai-summary { border-left: 4px solid #66ccff; padding-left: 1rem; margin: 1.5rem 0; }
+        code { background-color: #0f0f0f; padding: 0.2rem 0.4rem; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-search"></i> Lombaohsint v2.0 Black Edition</h1>
+        <p class="mb-0">MDTOOLS // By MDHojayfa</p>
+        <small>Generated on: {{ timestamp }}</small>
+    </div>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5><i class="fas fa-chart-line"></i> Summary</h5>
+                        <table class="table table-dark table-striped">
+                            <tr><td><strong>Total Findings</strong></td><td>{{ total_findings }}</td></tr>
+                            <tr><td><strong>Critical Risk</strong></td><td><span class="badge badge-risk-critical">{{ high_risk_count }}</span></td></tr>
+                            <tr><td><strong>High Risk</strong></td><td><span class="badge badge-risk-high">{{ medium_risk_count }}</span></td></tr>
+                            <tr><td><strong>Medium Risk</strong></td><td><span class="badge badge-risk-medium">{{ low_risk_count }}</span></td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card ai-summary">
+                    <div class="card-body">
+                        <h5><i class="fas fa-robot"></i> AI Digital Twin</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-user"></i> Identity</h6>
+                                <p><strong>Emails:</strong> {{ ai_summary.digital_twin.identity.emails | join(', ') }}</p>
+                                <p><strong>Phones:</strong> {{ ai_summary.digital_twin.identity.phones | join(', ') }}</p>
+                                <p><strong>Usernames:</strong> {{ ai_summary.digital_twin.identity.usernames | join(', ') }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6><i class="fas fa-exclamation-triangle"></i> Exposure</h6>
+                                <p><strong>Breaches:</strong> {{ ai_summary.digital_twin.exposure.breaches }}</p>
+                                <p><strong>Secrets:</strong> {{ ai_summary.digital_twin.exposure.secrets }}</p>
+                                <p><strong>Social Profiles:</strong> {{ ai_summary.digital_twin.exposure.social_profiles }}</p>
+                                <h6><i class="fas fa-bullseye"></i> Behavior</h6>
+                                <p><strong>Tech Exposure:</strong> {{ ai_summary.digital_twin.behavior.tech_exposure }}</p>
+                                <p><strong>Public Presence:</strong> {{ ai_summary.digital_twin.behavior.public_presence }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card section">
+                    <div class="card-body">
+                        <h5><i class="fas fa-shield-alt"></i> Ethical Insight</h5>
+                        <p>{{ ai_summary.ethical_insight | replace('\n', '<br>') | safe }}</p>
+                    </div>
+                </div>
+
+                <div class="card section">
+                    <div class="card-body">
+                        <h5><i class="fas fa-user-secret"></i> Unethical Awareness</h5>
+                        <p>{{ ai_summary.unethical_awareness | replace('\n', '<br>') | safe }}</p>
+                    </div>
+                </div>
+
+                {% for f in findings %}
+                {% if f.type == "AI_SUMMARY" %}{% continue %}{% endif %}
+
+                <div class="card section">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6><i class="fas fa-search"></i> {{ f.source }} — {{ f.type }}</h6>
+                        <span class="badge {% if f.risk == 'CRITICAL' %}badge-risk-critical{% elif f.risk == 'HIGH' %}badge-risk-high{% elif f.risk == 'MEDIUM' %}badge-risk-medium{% else %}badge-risk-low{% endif %}">{{ f.risk }}</span>
+                    </div>
+                    <div class="card-body">
+                        <pre><code>{{ f.data | tojson(indent=2) }}</code></pre>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="text-center mt-5">
+                    <p class="text-muted"><i class="fas fa-lock"></i> For authorized use only. | MDTOOLS by MDHojayfa</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
