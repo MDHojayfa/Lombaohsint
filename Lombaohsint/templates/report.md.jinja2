@@ -1,0 +1,58 @@
+# Lombaohsint Report  
+## Target: {{ findings[0].target if findings and 'target' in findings[0] else "Unknown" }}  
+### Generated on: {{ timestamp }}  
+### Mode: {{ level }}
+
+---
+
+## 🔍 Summary
+
+| Category | Count |
+|----------|-------|
+| Total Findings | {{ total_findings }} |
+| Critical Risk | {{ high_risk_count }} |
+| High Risk | {{ medium_risk_count }} |
+| Medium Risk | {{ low_risk_count }} |
+
+---
+
+## 🧠 AI Digital Twin
+
+### Identity
+- **Emails**: {% for email in ai_summary.digital_twin.identity.emails %}{{ email }}{% if not loop.last %}, {% endif %}{% endfor %}
+- **Phones**: {% for phone in ai_summary.digital_twin.identity.phones %}{{ phone }}{% if not loop.last %}, {% endif %}{% endfor %}
+- **Usernames**: {% for username in ai_summary.digital_twin.identity.usernames %}{{ username }}{% if not loop.last %}, {% endif %}{% endfor %}
+
+### Exposure
+- **Data Breaches**: {{ ai_summary.digital_twin.exposure.breaches }}
+- **Exposed Secrets**: {{ ai_summary.digital_twin.exposure.secrets }}
+- **Social Profiles**: {{ ai_summary.digital_twin.exposure.social_profiles }}
+
+### Behavior
+- **Tech Exposure**: {{ ai_summary.digital_twin.behavior.tech_exposure }}
+- **Public Presence**: {{ ai_summary.digital_twin.behavior.public_presence }}
+
+---
+
+## 💡 Ethical Insight
+
+{{ ai_summary.ethical_insight }}
+
+---
+
+## ⚠️ Unethical Awareness
+
+{{ ai_summary.unethical_awareness }}
+
+---
+
+## 📁 Detailed Findings
+
+{% for f in findings %}
+{% if f.type == "AI_SUMMARY" %}{% continue %}{% endif %}
+
+### {{ f.source }} — {{ f.type }}
+**Risk Level**: {{ f.risk }}
+
+```json
+{{ f.data | tojson(indent=2) }}
