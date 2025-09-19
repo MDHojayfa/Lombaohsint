@@ -56,7 +56,7 @@ if [[ "$EUID" -ne 0 ]] && [[ ! -f "/data/data/com.termux/files/usr/bin/pkg" ]]; 
 fi
 
 # --- DETECT OS ---
-if [ -f "/data/data/com.termux/files/usr/bin/pkg" ]; then
+if [ -n "$PREFIX" ] && [[ "$PREFIX" == *"/data/data/com.termux/files/usr"* ]]; then
     OS="TERMUX"
     log "Detected: Termux (Android)"
 elif [ -f "/etc/os-release" ] && grep -q "Kali" /etc/os-release; then
@@ -94,20 +94,33 @@ if [ ! -d ".git" ]; then
     }
 fi
 
+# --- CONVERT LINE ENDINGS (CRLF → LF) — CRITICAL FOR LINUX/TERMUX ---
+log "Converting file line endings from CRLF to LF..."
+if command -v dos2unix &>/dev/null; then
+    find . -type f \( -name "*.py" -o -name "*.sh" \) -exec dos2unix {} \;
+else
+    warn "dos2unix not found. Installing now..."
+    case $OS in
+        TERMUX)
+            pkg install dos2unix -y
+            find . -type f \( -name "*.py" -o -name "*.sh" \) -exec dos2unix {} \;
+            ;;
+        KALI|UBUNTU|DEBIAN)
+            apt-get update -y
+            apt-get install dos2unix -y
+            find . -type f \( -name "*.py" -o -name "*.sh" \) -exec dos2unix {} \;
+            ;;
+    esac
+fi
+
 # --- INSTALL DEPENDENCIES BY OS ---
 case $OS in
     TERMUX)
         log "Installing Termux dependencies..."
         pkg update -y
-        pkg install python git curl wget openssl-tool libffi clang make gcc -y
+        pkg install python git curl wget openssl-tool libffi clang make gcc proot-distro -y
 
-        # Install proot-distro if not present
-        if ! command -v proot-distro &>/dev/null; then
-            log "Installing proot-distro for Ubuntu chroot..."
-            pkg install proot-distro -y
-        fi
-
-        # Ensure Ubuntu chroot exists and is updated
+        # Install proot-distro Ubuntu if needed
         if ! proot-distro list | grep -q "ubuntu"; then
             log "Installing Ubuntu chroot..."
             proot-distro install ubuntu
@@ -141,17 +154,22 @@ case $OS in
     KALI|UBUNTU|DEBIAN)
         log "Installing system dependencies..."
         apt-get update -y
-        apt-get install python3 python3-pip git curl wget openssl libffi-dev libssl-dev build-essential clang tor proxychains-ng nmap hydra hashcat -y
+        apt-get install python3 python3-venv git curl wget openssl libffi-dev libssl-dev build-essential clang tor proxychains-ng nmap hydra hashcat amass subfinder shodan-cli censys -y
 
-        # Install pip packages
-        log "Installing Python requirements (this may take 5–15 minutes)..."
-        pip3 install --upgrade pip
-        pip3 install -r requirements.txt --break-system-packages --no-cache-dir
+        # Create virtual environment
+        log "Creating Python virtual environment at $BASE_DIR/venv..."
+        python3 -m venv "$BASE_DIR/venv"
 
-        # Create symlinks for CLI access
-        if [ ! -f "/usr/local/bin/lombaohsint" ]; then
-            ln -sf "$BASE_DIR/main.py" /usr/local/bin/lombaohsint
-            chmod +x /usr/local/bin/lombaohsint
+        # Activate venv and install requirements
+        log "Installing Python requirements inside virtual environment..."
+        source "$BASE_DIR/venv/bin/activate"
+        pip install --upgrade pip
+        pip install -r requirements.txt --break-system-packages
+
+        # Create global alias to run via venv
+        if ! grep -q "alias lombaohsint=" ~/.bashrc; then
+            echo "alias lombaohsint='source \"$BASE_DIR/venv/bin/activate\" && python3 \"$BASE_DIR/main.py\"'" >> ~/.bashrc
+            source ~/.bashrc
             success "Created global command: lombaohsint"
         fi
 
@@ -179,34 +197,25 @@ esac
 # --- FINAL SETUP: COPY FILES INTO PLACE ---
 log "Copying core files into place..."
 cp -f assets/banner.txt assets/quotes.txt config.yaml requirements.txt ./
-mkdir -p data/cache data/logs reports
+mkdir -p data/cache/email_cache data/cache/phone_cache data/cache/username_cache data/cache/darkweb_cache data/logs reports
 
 # --- VERIFY CONFIG.YAML EXISTS ---
 if [ ! -f "config.yaml" ]; then
     cat > config.yaml << 'EOF'
-# ============================================================
-# LOMBAOHSINT v2.0 BLACK EDITION — GLOBAL CONFIGURATION
-# DO NOT EDIT UNLESS YOU KNOW WHAT YOU'RE DOING.
-# ============================================================
-
 level: "BLACK"
-
 output_dir: "reports"
 export_formats:
   - "md"
   - "html"
   - "json"
-
 verbose: false
 log_file: "data/logs/lombaohsint.log"
 max_log_size_mb: 100
 log_retention_days: 7
-
 request_timeout: 10
 delay_between_requests_sec: 0.5
 max_retries: 3
 retry_delay_base_sec: 2
-
 use_tor: true
 tor_port: 9050
 tor_control_port: 9051
@@ -215,7 +224,6 @@ proxy_list:
   - "http://proxy1.example.com:8080"
   - "http://proxy2.example.com:8080"
   - "socks5://127.0.0.1:9050"
-
 api_keys:
   twilio: ""
   numverify: ""
@@ -230,7 +238,6 @@ api_keys:
   truecaller: ""
   trestle: ""
   riskseal: ""
-
 ai_model: "gpt-4o"
 ai_endpoint: "https://api.openai.com/v1/chat/completions"
 ai_api_key: ""
@@ -240,21 +247,17 @@ ai_max_tokens: 1500
 ai_temperature: 0.7
 ai_local_mode: false
 ai_local_model_name: "llama-3-70b-instruct"
-
 cache_ttl_hours: 24
 use_sqlite_cache: true
 sqlite_db_path: "data/breaches.sqlite"
-
-termux_fix_enabled: false
+termux_fix_enabled: true
 sdcard_mount_path: "/storage/emulated/0"
 termux_bin_path: "/data/data/com.termux/files/usr/bin"
-
 agent_enabled: false
 agent_interval_minutes: 120
 agent_notify_telegram: false
 telegram_bot_token: ""
 telegram_chat_id: ""
-
 skip_public_apis: false
 force_new_scan: false
 enable_debug_mode: false
@@ -276,9 +279,15 @@ echo -e "\n${CYAN}Would you like to run a quick self-test? [y/N]: ${NC}"
 read -r response
 if [[ "$response" =~ ^[Yy]$ ]]; then
     echo -e "\nRunning self-test..."
-    python3 main.py --target test@mdtools.local --level GENTLE --i-am-authorized 2>/dev/null || {
-        warn "Self-test failed — but this is normal on first run. Files will generate on next use."
-    }
+    if [ "$OS" = "TERMUX" ]; then
+        proot-distro login ubuntu -- bash -c "cd $BASE_DIR && python3 main.py --target test@mdtools.local --level GENTLE --i-am-authorized" 2>/dev/null || {
+            warn "Self-test failed — but this is normal on first run. Files will generate on next use."
+        }
+    else
+        source "$BASE_DIR/venv/bin/activate" && python3 main.py --target test@mdtools.local --level GENTLE --i-am-authorized 2>/dev/null || {
+            warn "Self-test failed — but this is normal on first run. Files will generate on next use."
+        }
+    fi
 fi
 
 echo -e "\n${CYAN}You now hold the keys to the kingdom.${NC}"
