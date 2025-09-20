@@ -3,8 +3,6 @@
 # Author: MDHojayfa | MDTOOLS
 # DO NOT EDIT. RUN AS ROOT. NO QUESTIONS ASKED.
 
-echo "Don't forget to run the install.sh after this"
-
 
 
 RED='\033[0;31m'
@@ -218,5 +216,3 @@ fi
 
 echo -e "\n${CYAN}You now hold the keys to the kingdom.${NC}"
 echo -e "${YELLOW}Stay sharp. The truth doesn't wait.${NC}"
-
-echo "Don't forget to run the installer after this"
