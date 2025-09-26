@@ -5,8 +5,8 @@ import time
 from pathlib import Path
 from utils.obfuscation import get_random_ua
 from utils.logger import logging
-from waybackpy import WaybackMachineSaveAPI
 from maigret.maigret import check_username
+import waybackpy  # Only import the main package
 
 def run(target, level, config, api_wrapper, proxy_rotator):
     results = []
@@ -29,20 +29,20 @@ def run(target, level, config, api_wrapper, proxy_rotator):
             if data.get("exists"):
                 url = data.get("url")
                 status = "active"
-                archived_url = None
 
-                # Try to archive if possible
+                # Archive via Wayback Machine (correct usage)
+                archived_url = None
                 if level == "BLACK":
                     try:
-                        save_api = WaybackMachineSaveAPI(url)
-                        save_api.save()
-                        archived_url = save_api.archive_url
-                    except: pass
+                        w = waybackpy.WaybackMachine(url, headers["User-Agent"])
+                        archived_url = w.save().archive_url
+                    except Exception as e:
+                        logging.warning(f"Wayback save failed for {url}: {e}")
 
                 results.append({
                     "type": "USERNAME_FOUND",
                     "source": site,
-                    "data": {
+                    **"data": {
                         "url": url,
                         "status": status,
                         "last_seen": data.get("timestamp", ""),
@@ -69,20 +69,23 @@ def run(target, level, config, api_wrapper, proxy_rotator):
         domains = ["facebook.com", "instagram.com", "twitter.com", "linkedin.com", "github.com"]
         for domain in domains:
             try:
-                wayback = WaybackMachineSaveAPI(f"https://{domain}/{target}")
-                snapshots = wayback.snapshots()
+                url = f"https://{domain}/{target}"
+                w = waybackpy.WaybackMachine(url, headers["User-Agent"])
+                snapshots = w.archives()
                 for snap in snapshots[:3]:
                     results.append({
                         "type": "WAYBACK_ARCHIVED",
                         "source": "Wayback Machine",
                         "data": {
-                            "url": snap.url,
-                            "timestamp": snap.timestamp,
-                            "archive_link": snap.archive_url
+                            "url": snap.original(),
+                            "timestamp": snap.timestamp(),
+                            "archive_link": snap.archive_url()
                         },
                         "risk": "MEDIUM"
                     })
-            except: pass
+            except Exception as e:
+                logging.debug(f"Wayback archive search failed for {domain}/{target}: {e}")
+                continue
 
     # Google Dorking for username
     if level == "BLACK":
@@ -91,7 +94,8 @@ def run(target, level, config, api_wrapper, proxy_rotator):
             f"site:github.com \"{target}\"",
             f"site:twitter.com \"{target}\"",
             f"site:instagram.com \"{target}\"",
-            f"\"{target}\" \"email\""
+            f"\"{target}\" \"email\"",
+            f"\"{target}\" \"phone\""
         ]
         for dork in dorks:
             try:
@@ -100,16 +104,21 @@ def run(target, level, config, api_wrapper, proxy_rotator):
                     headers=headers, proxies=proxies, timeout=8
                 )
                 if resp.status_code == 200 and target in resp.text:
-                    results.append({
-                        "type": "GOOGLE_DORK_MATCH",
-                        "source": "Google",
-                        "data": {
-                            "dork": dork,
-                            "snippet": resp.text[resp.text.find(target):resp.text.find(target)+200]
-                        },
-                        "risk": "LOW"
-                    })
-            except: pass
+                    urls = re.findall(r'(https?://[^\s"<>\]]+)', resp.text)
+                    for url in urls[:3]:
+                        results.append({
+                            "type": "GOOGLE_DORK_MATCH",
+                            "source": "Google",
+                            "data": {
+                                "dork": dork,
+                                "url": url,
+                                "snippet": resp.text[resp.text.find(target):resp.text.find(target)+200]
+                            },
+                            "risk": "LOW"
+                        })
+            except Exception as e:
+                logging.debug(f"Google dork failed for '{dork}': {e}")
+                continue
 
     # Cache results
     if level == "BLACK":
