@@ -37,6 +37,8 @@ Run this on **Kali, Ubuntu, Termux, or Debian**:
 git clone https://github.com/MDHojayfa/Lombaohsint.git
 cd Lombaohsint
 sudo bash install.sh
+sudo source (activate your venv)
+sudo pip install -r requirements.txt
 ```
 
 Then run your first scan:
